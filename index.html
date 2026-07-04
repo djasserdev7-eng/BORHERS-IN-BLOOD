@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة الموارد البشرية والأجور - الجزائر</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- jsPDF & AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .hidden-auth { display: none !important; }
+        .modal { display: none; background-color: rgba(0, 0, 0, 0.5); }
+        .modal.active { display: flex; }
+    </style>
+</head>
+<body class="text-gray-800 transition-all duration-300">
+
+    <!-- Navbar -->
+    <nav class="bg-blue-900 text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 flex justify-between items-center py-4">
+            <div class="flex items-center space-x-4 space-x-reverse">
+                <i class="fas fa-chart-line text-2xl"></i>
+                <h1 class="text-xl font-bold" data-i18n="appTitle">نظام الأجور والموارد البشرية</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <select id="langSelect" class="bg-blue-800 text-white border-none rounded px-2 py-1 outline-none">
+                    <option value="ar">العربية (AR)</option>
+                    <option value="fr">Français (FR)</option>
+                    <option value="en">English (EN)</option>
+                </select>
+                <button id="logoutBtn" class="hidden bg-red-600 hover:bg-red-700 px-4 py-2 rounded transition" data-i18n="logout">تسجيل الخروج</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Login Section -->
+    <div id="loginSection" class="min-h-[80vh] flex items-center justify-center">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-96 max-w-full">
+            <div class="text-center mb-6">
+                <div class="bg-blue-100 text-blue-900 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-lock text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold" data-i18n="loginTitle">تسجيل الدخول</h2>
+            </div>
+            <div id="loginError" class="hidden bg-red-100 text-red-700 p-3 rounded mb-4 text-sm text-center"></div>
+            <div class="mb-4">
+                <label class="block text-sm font-semibold mb-2" data-i18n="username">اسم المستخدم</label>
+                <input type="text" id="username" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-900 outline-none" dir="ltr">
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm font-semibold mb-2" data-i18n="password">كلمة المرور</label>
+                <input type="password" id="password" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-900 outline-none" dir="ltr">
+            </div>
+            <button id="loginBtn" class="w-full bg-blue-900 text-white py-2 rounded-lg hover:bg-blue-800 transition font-bold" data-i18n="loginBtn">دخول</button>
+        </div>
+    </div>
+
+    <!-- Dashboard Section -->
+    <div id="dashboardSection" class="hidden max-w-7xl mx-auto px-4 py-8">
+        <!-- Header & Toolbar -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+            <h2 class="text-2xl font-bold" data-i18n="dashboardTitle">إدارة الموظفين والأجور</h2>
+            <div class="flex gap-4 w-full md:w-auto">
+                <input type="text" id="searchInput" class="px-4 py-2 border rounded-lg w-full md:w-64 focus:ring-2 focus:ring-blue-900" data-i18n-placeholder="search" placeholder="بحث بالاسم أو الرقم...">
+                <button id="addEmpBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 whitespace-nowrap flex items-center gap-2">
+                    <i class="fas fa-user-plus"></i> <span data-i18n="addEmployee">إضافة موظف</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Employees Table -->
+        <div class="bg-white rounded-lg shadow overflow-x-auto">
+            <table class="w-full text-right" id="empTable">
+                <thead class="bg-gray-100 text-gray-700">
+                    <tr>
+                        <th class="px-4 py-3" data-i18n="empId">الرقم الوظيفي</th>
+                        <th class="px-4 py-3" data-i18n="empName">الاسم واللقب</th>
+                        <th class="px-4 py-3" data-i18n="empPosition">المنصب</th>
+                        <th class="px-4 py-3" data-i18n="empBase">الأجر القاعدي</th>
+                        <th class="px-4 py-3 text-center" data-i18n="actions">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="empTableBody" class="divide-y divide-gray-200">
+                    <!-- Data will be injected here via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Employee Modal (Add/Edit) -->
+    <div id="empModal" class="modal fixed inset-0 z-50 items-center justify-center">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 relative">
+            <button class="close-modal absolute top-4 right-4 text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button>
+            <h3 class="text-xl font-bold mb-4" id="modalTitle" data-i18n="addEmployee">إضافة موظف</h3>
+            <input type="hidden" id="editEmpId">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm mb-1" data-i18n="empId">الرقم الوظيفي</label>
+                    <input type="text" id="formEmpId" class="w-full border rounded p-2 outline-none focus:ring-2 focus:ring-blue-900">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" data-i18n="empName">الاسم واللقب</label>
+                    <input type="text" id="formEmpName" class="w-full border rounded p-2 outline-none focus:ring-2 focus:ring-blue-900">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" data-i18n="empPosition">المنصب / الرتبة</label>
+                    <input type="text" id="formEmpPosition" class="w-full border rounded p-2 outline-none focus:ring-2 focus:ring-blue-900">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" data-i18n="empAffectation">جهة التعيين</label>
+                    <input type="text" id="formEmpAffectation" class="w-full border rounded p-2 outline-none focus:ring-2 focus:ring-blue-900">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1" data-i18n="empBase">الأجر القاعدي (DZD)</label>
+                    <input type="number" id="formEmpBase" class="w-full border rounded p-2 outline-none focus:ring-2 focus:ring-blue-900">
+                </div>
+                <button id="saveEmpBtn" class="w-full bg-blue-900 text-white py-2 rounded hover:bg-blue-800 font-bold" data-i18n="save">حفظ البيانات</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payroll Calculator Modal -->
+    <div id="payrollModal" class="modal fixed inset-0 z-50 items-center justify-center overflow-y-auto py-10">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 relative m-auto">
+            <button class="close-modal absolute top-4 right-4 text-gray-500 hover:text-red-500"><i class="fas fa-times text-xl"></i></button>
+            <h3 class="text-xl font-bold mb-4" data-i18n="calcPayroll">حساب الأجر والراتب</h3>
+            <div class="bg-blue-50 p-3 rounded mb-4 text-sm font-semibold" id="payrollEmpName"></div>
+            <input type="hidden" id="payEmpId">
+            
+            <div class="space-y-3">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <label class="text-sm font-bold" data-i18n="empBase">الأجر القاعدي</label>
+                    <input type="number" id="payBase" class="border rounded p-1 w-32 text-center bg-gray-100" readonly>
+                </div>
+                <div class="flex justify-between items-center border-b pb-2">
+                    <label class="text-sm" data-i18n="primeNuisance">منحة الضرر (Prime de nuisance)</label>
+                    <input type="number" id="payNuisance" class="border rounded p-1 w-32 text-center focus:ring-2" value="0">
+                </div>
+                <div class="flex justify-between items-center border-b pb-2">
+                    <label class="text-sm" data-i18n="primeIep">منحة الخبرة المهنية (IEP)</label>
+                    <input type="number" id="payIep" class="border rounded p-1 w-32 text-center focus:ring-2" value="0">
+                </div>
+                
+                <button id="calcBtn" class="w-full bg-yellow-500 text-white py-2 rounded font-bold hover:bg-yellow-600 my-2" data-i18n="calcAction">تنفيذ الحساب (CNAS & IRG)</button>
+
+                <div class="bg-gray-100 p-3 rounded space-y-2">
+                    <div class="flex justify-between text-sm text-red-600">
+                        <span data-i18n="cnas">اقتطاع الضمان الاجتماعي (9%)</span>
+                        <span id="resCnas" class="font-bold">0.00</span>
+                    </div>
+                    <div class="flex justify-between text-sm text-red-600">
+                        <span data-i18n="irg">الضريبة على الدخل (IRG)</span>
+                        <span id="resIrg" class="font-bold">0.00</span>
+                    </div>
+                    <div class="flex justify-between text-lg text-green-700 font-bold border-t border-gray-300 pt-2">
+                        <span data-i18n="netSalary">الصافي للدفع (NET A PAYER)</span>
+                        <span id="resNet">0.00</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 mt-4">
+                    <button id="savePayrollBtn" class="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700 font-bold" data-i18n="save">حفظ</button>
+                    <button id="printPdfBtn" class="flex-1 bg-gray-800 text-white py-2 rounded hover:bg-gray-900 font-bold flex justify-center items-center gap-2">
+                        <i class="fas fa-file-pdf"></i> <span data-i18n="exportPdf">استخراج PDF</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase & Logic Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, get, set, push, update, remove, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // Firebase Configuration (From User Prompt)
+        const firebaseConfig = {
+            apiKey: "AIzaSyBdrY8jU9n0oHgjAwxTuQquRIHMWjz6UA0",
+            authDomain: "rabi-5948f.firebaseapp.com",
+            projectId: "rabi-5948f",
+            storageBucket: "rabi-5948f.firebasestorage.app",
+            messagingSenderId: "115853006636",
+            appId: "1:115853006636:web:2efeefde48ae62f740fe89",
+            measurementId: "G-PSZCFJFMKV"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // State Variables
+        let currentUser = null;
+        let currentLang = 'ar';
+        let employeesData = {};
+        let currentCalculatedPayroll = null;
+
+        // I18n Dictionary
+        const translations = {
+            ar: {
+                appTitle: "نظام الأجور والموارد البشرية", logout: "تسجيل الخروج",
+                loginTitle: "تسجيل الدخول", username: "اسم المستخدم", password: "كلمة المرور",
+                loginBtn: "دخول", loginErr: "بيانات الدخول غير صحيحة!",
+                dashboardTitle: "إدارة الموظفين والأجور", search: "بحث بالاسم أو الرقم...",
+                addEmployee: "إضافة موظف", empId: "الرقم الوظيفي", empName: "الاسم واللقب",
+                empPosition: "المنصب / الرتبة", empAffectation: "جهة التعيين", empBase: "الأجر القاعدي",
+                actions: "الإجراءات", save: "حفظ البيانات", calcPayroll: "حساب الأجر والراتب",
+                primeNuisance: "منحة الضرر (Prime de nuisance)", primeIep: "منحة الخبرة المهنية (IEP)",
+                calcAction: "تنفيذ الحساب (CNAS & IRG)", cnas: "اقتطاع الضمان الاجتماعي (9%)",
+                irg: "الضريبة على الدخل (IRG)", netSalary: "الصافي للدفع (NET A PAYER)", exportPdf: "استخراج PDF",
+                edit: "تعديل", delete: "حذف", calc: "الأجر"
+            },
+            fr: {
+                appTitle: "Système de Paie & RH", logout: "Déconnexion",
+                loginTitle: "Connexion", username: "Nom d'utilisateur", password: "Mot de passe",
+                loginBtn: "Entrer", loginErr: "Identifiants incorrects !",
+                dashboardTitle: "Gestion des Employés & Paie", search: "Recherche par nom ou matricule...",
+                addEmployee: "Ajouter Employé", empId: "Matricule", empName: "Nom & Prénom",
+                empPosition: "Fonction", empAffectation: "Affectation", empBase: "Salaire de base",
+                actions: "Actions", save: "Enregistrer", calcPayroll: "Calcul de la Paie",
+                primeNuisance: "Prime de nuisance", primeIep: "Indemnité d'Expérience (IEP)",
+                calcAction: "Calculer (CNAS & IRG)", cnas: "Retenue Sécurité Sociale (9%)",
+                irg: "Impôt sur le Revenu (IRG)", netSalary: "NET A PAYER", exportPdf: "Exporter PDF",
+                edit: "Modifier", delete: "Supprimer", calc: "Paie"
+            },
+            en: {
+                appTitle: "HR & Payroll System", logout: "Logout",
+                loginTitle: "Login", username: "Username", password: "Password",
+                loginBtn: "Login", loginErr: "Invalid credentials!",
+                dashboardTitle: "Employee & Payroll Management", search: "Search by name or ID...",
+                addEmployee: "Add Employee", empId: "Employee ID", empName: "Full Name",
+                empPosition: "Position", empAffectation: "Department", empBase: "Base Salary",
+                actions: "Actions", save: "Save", calcPayroll: "Payroll Calculation",
+                primeNuisance: "Nuisance Allowance", primeIep: "Experience Allowance (IEP)",
+                calcAction: "Calculate (CNAS & IRG)", cnas: "Social Security (9%)",
+                irg: "Income Tax (IRG)", netSalary: "NET TO PAY", exportPdf: "Export PDF",
+                edit: "Edit", delete: "Delete", calc: "Payroll"
+            }
+        };
+
+        // UI Translation Function
+        function updateUI() {
+            document.documentElement.lang = currentLang;
+            document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+            
+            // Text Content
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[currentLang][key]) {
+                    el.innerHTML = el.innerHTML.replace(el.innerText, translations[currentLang][key]);
+                }
+            });
+            // Placeholders
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                if (translations[currentLang][key]) el.placeholder = translations[currentLang][key];
+            });
+
+            // Re-render table if data exists to translate dynamic action buttons
+            renderTable(employeesData);
+        }
+
+        document.getElementById('langSelect').addEventListener('change', (e) => {
+            currentLang = e.target.value;
+            updateUI();
+        });
+
+        // Setup Default Admin User (If DB is empty)
+        async function setupAdmin() {
+            const usersRef = ref(db, 'utilisateurs/admin');
+            const snapshot = await get(usersRef);
+            if (!snapshot.exists()) {
+                await set(usersRef, { password: "ربيع 2026", role: "admin" });
+            }
+        }
+        setupAdmin();
+
+        // History Logger
+        function logAction(actionName, detailsStr) {
+            push(ref(db, 'historique'), {
+                action: actionName,
+                details: detailsStr,
+                timestamp: new Date().toLocaleString('fr-FR'),
+                user: "admin"
+            });
+        }
+
+        // Authentication Logic
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            const userVal = document.getElementById('username').value.trim();
+            const passVal = document.getElementById('password').value.trim();
+            const errorDiv = document.getElementById('loginError');
+            
+            const userRef = ref(db, `utilisateurs/${userVal}`);
+            try {
+                const snapshot = await get(userRef);
+                if (snapshot.exists() && snapshot.val().password === passVal) {
+                    currentUser = userVal;
+                    document.getElementById('loginSection').classList.add('hidden');
+                    document.getElementById('dashboardSection').classList.remove('hidden');
+                    document.getElementById('logoutBtn').classList.remove('hidden');
+                    errorDiv.classList.add('hidden');
+                    logAction("LOGIN", `User ${userVal} logged in.`);
+                    fetchEmployees();
+                } else {
+                    errorDiv.innerText = translations[currentLang].loginErr;
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            currentUser = null;
+            document.getElementById('dashboardSection').classList.add('hidden');
+            document.getElementById('logoutBtn').classList.add('hidden');
+            document.getElementById('loginSection').classList.remove('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        });
+
+        // Modals Logic
+        const closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+        document.querySelectorAll('.close-modal').forEach(btn => btn.addEventListener('click', closeModals));
+
+        // Employee CRUD
+        document.getElementById('addEmpBtn').addEventListener('click', () => {
+            document.getElementById('editEmpId').value = '';
+            document.getElementById('formEmpId').value = '';
+            document.getElementById('formEmpName').value = '';
+            document.getElementById('formEmpPosition').value = '';
+            document.getElementById('formEmpAffectation').value = '';
+            document.getElementById('formEmpBase').value = '';
+            document.getElementById('modalTitle').innerText = translations[currentLang].addEmployee;
+            document.getElementById('empModal').classList.add('active');
+        });
+
+        document.getElementById('saveEmpBtn').addEventListener('click', async () => {
+            const key = document.getElementById('editEmpId').value;
+            const empData = {
+                matricule: document.getElementById('formEmpId').value,
+                nom: document.getElementById('formEmpName').value,
+                fonction: document.getElementById('formEmpPosition').value,
+                affectation: document.getElementById('formEmpAffectation').value,
+                salaire_base: parseFloat(document.getElementById('formEmpBase').value) || 0
+            };
+
+            if (key) {
+                await update(ref(db, `employes/${key}`), empData);
+                logAction("UPDATE_EMP", `Updated employee ${empData.nom}`);
+            } else {
+                await push(ref(db, 'employes'), empData);
+                logAction("ADD_EMP", `Added employee ${empData.nom}`);
+            }
+            closeModals();
+        });
+
+        function fetchEmployees() {
+            onValue(ref(db, 'employes'), (snapshot) => {
+                employeesData = snapshot.val() || {};
+                renderTable(employeesData);
+            });
+        }
+
+        function renderTable(data, filter = '') {
+            const tbody = document.getElementById('empTableBody');
+            tbody.innerHTML = '';
+            Object.keys(data).forEach(key => {
+                const emp = data[key];
+                if (filter && !emp.nom.toLowerCase().includes(filter.toLowerCase()) && !emp.matricule.includes(filter)) return;
+                
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition";
+                tr.innerHTML = `
+                    <td class="px-4 py-3 border-b">${emp.matricule}</td>
+                    <td class="px-4 py-3 border-b font-bold text-blue-900">${emp.nom}</td>
+                    <td class="px-4 py-3 border-b">${emp.fonction}</td>
+                    <td class="px-4 py-3 border-b">${emp.salaire_base.toFixed(2)} DZD</td>
+                    <td class="px-4 py-3 border-b text-center space-x-2 space-x-reverse">
+                        <button onclick="editEmp('${key}')" class="text-blue-600 hover:text-blue-800" title="${translations[currentLang].edit}"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteEmp('${key}', '${emp.nom}')" class="text-red-600 hover:text-red-800" title="${translations[currentLang].delete}"><i class="fas fa-trash"></i></button>
+                        <button onclick="openPayroll('${key}')" class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm hover:bg-blue-200" title="${translations[currentLang].calc}"><i class="fas fa-calculator"></i> ${translations[currentLang].calc}</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            renderTable(employeesData, e.target.value);
+        });
+
+        // Exposing functions to global scope for inline HTML onclick handlers
+        window.editEmp = (key) => {
+            const emp = employeesData[key];
+            document.getElementById('editEmpId').value = key;
+            document.getElementById('formEmpId').value = emp.matricule;
+            document.getElementById('formEmpName').value = emp.nom;
+            document.getElementById('formEmpPosition').value = emp.fonction;
+            document.getElementById('formEmpAffectation').value = emp.affectation || '';
+            document.getElementById('formEmpBase').value = emp.salaire_base;
+            document.getElementById('modalTitle').innerText = translations[currentLang].edit;
+            document.getElementById('empModal').classList.add('active');
+        };
+
+        window.deleteEmp = async (key, name) => {
+            if (confirm(`هل أنت متأكد من حذف الموظف ${name}؟`)) {
+                await remove(ref(db, `employes/${key}`));
+                logAction("DELETE_EMP", `Deleted employee ${name}`);
+            }
+        };
+
+        window.openPayroll = (key) => {
+            const emp = employeesData[key];
+            document.getElementById('payEmpId').value = key;
+            document.getElementById('payrollEmpName').innerText = `${emp.matricule} - ${emp.nom}`;
+            document.getElementById('payBase').value = emp.salaire_base;
+            document.getElementById('payNuisance').value = 0;
+            document.getElementById('payIep').value = 0;
+            
+            document.getElementById('resCnas').innerText = "0.00";
+            document.getElementById('resIrg').innerText = "0.00";
+            document.getElementById('resNet').innerText = "0.00";
+            currentCalculatedPayroll = null;
+            
+            document.getElementById('payrollModal').classList.add('active');
+        };
+
+        // Payroll Calculation Engine (Algerian Law 2022)
+        document.getElementById('calcBtn').addEventListener('click', () => {
+            const base = parseFloat(document.getElementById('payBase').value) || 0;
+            const nuisance = parseFloat(document.getElementById('payNuisance').value) || 0;
+            const iep = parseFloat(document.getElementById('payIep').value) || 0;
+
+            // Assiette SS (Cotisable)
+            const assietteSS = base + nuisance + iep;
+            
+            // Retenue CNAS 9%
+            const cnas = assietteSS * 0.09;
+            
+            // Assiette IRG (Imposable)
+            const assietteIRG = assietteSS - cnas;
+            
+            // Calcul IRG 2022
+            let irg = 0;
+            if (assietteIRG <= 30000) {
+                irg = 0;
+            } else if (assietteIRG > 30000 && assietteIRG <= 35000) {
+                irg = (assietteIRG - 30000) * (8 / 3);
+            } else if (assietteIRG > 35000 && assietteIRG <= 120000) {
+                irg = (assietteIRG - 30000) * 0.3;
+            } else {
+                irg = ((assietteIRG - 120000) * 0.35) + 27000;
+            }
+
+            const netPay = assietteSS - cnas - irg;
+
+            // UI Update
+            document.getElementById('resCnas').innerText = cnas.toFixed(2);
+            document.getElementById('resIrg').innerText = irg.toFixed(2);
+            document.getElementById('resNet').innerText = netPay.toFixed(2) + " DZD";
+
+            // Save to memory for Firebase & PDF
+            currentCalculatedPayroll = {
+                base, nuisance, iep, cnas, irg, netPay,
+                mois: new Date().getMonth() + 1,
+                annee: new Date().getFullYear()
+            };
+        });
+
+        document.getElementById('savePayrollBtn').addEventListener('click', async () => {
+            if (!currentCalculatedPayroll) return alert("قم بحساب الراتب أولاً!");
+            const empId = document.getElementById('payEmpId').value;
+            const empName = employeesData[empId].nom;
+            
+            const record = {
+                employe_id: empId,
+                ...currentCalculatedPayroll,
+                date: new Date().toISOString()
+            };
+
+            await push(ref(db, 'salaires'), record);
+            
+            // Save details to dedicated nodes as requested
+            await push(ref(db, 'primes'), { employe_id: empId, nuisance: record.nuisance, iep: record.iep });
+            await push(ref(db, 'retenues'), { employe_id: empId, cnas: record.cnas, irg: record.irg });
+            
+            logAction("CALC_PAYROLL", `Calculated payroll for ${empName} - Net: ${record.netPay}`);
+            alert("تم الحفظ بنجاح!");
+        });
+
+        // PDF Generation
+        document.getElementById('printPdfBtn').addEventListener('click', () => {
+            if (!currentCalculatedPayroll) return alert("قم بحساب الراتب أولاً!");
+            
+            const empKey = document.getElementById('payEmpId').value;
+            const emp = employeesData[empKey];
+            const p = currentCalculatedPayroll;
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            const monthNames = ["JANVIER", "FEVRIER", "MARS", "AVRIL", "MAI", "JUIN", "JUILLET", "AOUT", "SEPTEMBRE", "OCTOBRE", "NOVEMBRE", "DECEMBRE"];
+            const currentMonth = monthNames[p.mois - 1];
+
+            // Header Structure
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text("BOUCHELA TAHAR", 105, 20, { align: "center" });
+            doc.setFontSize(18);
+            doc.text("FICHE DE PAIE", 105, 32, { align: "center" });
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            doc.text(`${currentMonth} ${p.annee}`, 105, 42, { align: "center" });
+
+            // Employee Info Box
+            doc.setLineWidth(0.5);
+            doc.rect(14, 50, 182, 25);
+            doc.setFontSize(10);
+            doc.text(`NOM & PRENOM : ${emp.nom.toUpperCase()}`, 18, 57);
+            doc.text(`N° BASE : ${emp.matricule}`, 130, 57);
+            doc.text(`FONCTION : ${emp.fonction.toUpperCase()}`, 18, 68);
+            doc.text(`AFFECTATION : ${emp.affectation ? emp.affectation.toUpperCase() : '/'}`, 130, 68);
+
+            // Table Data
+            const tableBody = [
+                ["Salaire de base", p.base.toFixed(2), "", p.base.toFixed(2)],
+                ["Prime de nuisance", p.nuisance.toFixed(2), "", p.nuisance.toFixed(2)],
+                ["Indemnité d'Expérience (IEP)", p.iep.toFixed(2), "", p.iep.toFixed(2)],
+                ["Retenue Sécurité Sociale (CNAS)", "", "9 %", p.cnas.toFixed(2)],
+                ["Impôt sur le Revenu (IRG)", "", "Barème", p.irg.toFixed(2)]
+            ];
+
+            doc.autoTable({
+                startY: 85,
+                head: [["DESIGNATION", "BASE", "TAXE / TAUX", "MONTANT"]],
+                body: tableBody,
+                theme: 'grid',
+                headStyles: { fillColor: [200, 200, 200], textColor: 0, fontStyle: 'bold', halign: 'center' },
+                columnStyles: {
+                    0: { halign: 'left', cellWidth: 80 },
+                    1: { halign: 'right' },
+                    2: { halign: 'center' },
+                    3: { halign: 'right', fontStyle: 'bold' }
+                }
+            });
+
+            // Footer / Net to Pay
+            const finalY = doc.lastAutoTable.finalY;
+            
+            // Dotted Line
+            doc.setLineDash([2, 2], 0);
+            doc.line(14, finalY + 10, 196, finalY + 10);
+            doc.setLineDash([]); // reset
+
+            // Net Box
+            doc.setFillColor(230, 230, 230);
+            doc.rect(90, finalY + 20, 106, 15, 'F');
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("NET A PAYER :", 95, finalY + 30);
+            doc.text(`${p.netPay.toFixed(2)} DZD`, 150, finalY + 30);
+
+            // Signature area
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text("Signature de l'employeur", 150, finalY + 60);
+
+            doc.save(`Fiche_Paie_${emp.matricule}_${currentMonth}_${p.annee}.pdf`);
+            logAction("EXPORT_PDF", `Exported PDF for ${emp.nom}`);
+        });
+
+        // Init language UI
+        updateUI();
+    </script>
+</body>
+</html>
